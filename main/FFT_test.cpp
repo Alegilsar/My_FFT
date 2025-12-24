@@ -12,18 +12,27 @@ typedef std::complex<double> Complex;
 class FFT{
 private:
     // some simple ffts for mixed radix
-    void dft_radix2 (Complex result[], Complex input[], bool inverse ){
+    void dft_radix2 (Complex result[], Complex input[]){
         result[0] = input[0] + input[1];
         result[1] = input[0] - input[1];
-        //special scaling for inverse
-        if (inverse){
-            result[0] = 0.5*result[0];
-            result[1] = 0.5*result[1];
-        }
+        
     }
-    void dft_radix3 (Complex result[], Complex input[], bool inverse){
+    void dft_radix3 (Complex result[], Complex input[]){
+
+
+        double angle = -1*2*PI/3;
+
+        // twiddels for radix3 but
+        Complex w_3 = std::exp(Complex(0,angle));
+        Complex w_3_2 = w_3*w_3;
+
+        result[0] = input[0] + input[1] + input[2];
+        result[1] = input[0] + w_3*input[1] + w_3_2*input[2];
+        result[2] = input[0] + w_3_2*input[1] + w_3*input[2];
 
     }
+
+    void dft_radix5(Complex result[], Complex input[]){}
 public:
     static bool isValidLen(size_t n){
         if (n == 0){
@@ -110,7 +119,44 @@ public:
 
         }
     }
+    static std::vector<Complex> fft_radix3_rec(std::vector<Complex>& input, size_t n, bool inverse){
+        if (n==1) return input;
 
+        // this part will be out off part because I want
+        
+        std::vector<Complex> X0(n/3), X1(n/3) , X2(n/3);
+
+        for (size_t i = 0 ; i < n/3 ; i++){
+            X0[i] = input[3*i];
+            X1[i] = input[3*i + 1];
+            X2[i] = input[3*i + 2];
+        }
+        //recursive for each group
+        auto x0 = fft_radix3_rec(X0, n/3, inverse);
+        auto x1 = fft_radix3_rec(X1, n/3, inverse);
+        auto x2 = fft_radix3_rec(X2, n/3, inverse);
+
+        std::vector<Complex> result(n);
+
+        Complex w = std::exp(Complex(0, -2*PI/n));
+        for (size_t k = 0; k < n/3 ; ++k){
+            Complex w_k = std::pow(w,k);
+            Complex w_k2 = w_k*w_k;
+
+            Complex x1_twid = w_k *  x1[k];
+            Complex x2_twid = w_k2 *  x2[k];
+
+            Complex w3 = std::exp(Complex(0, -2*PI/3));
+            Complex w3_2 = w3*w3;
+
+
+            result[k] = x0[k] + x1_twid + x2_twid;
+            result[k + n/3] = x0[k] + x1_twid*w3 + x2_twid*w3_2;
+            result[k + 2*n/3] = x0[k] + x1_twid*w3_2 + x2_twid*w3;
+        }
+
+        return result;
+    }
          
     
 };
@@ -130,6 +176,19 @@ int main()
             std::cout << "X[" << i << "] = " << signal[i] << "\n";
         }
         
+    }
+
+    {
+        std::cout << "=== Тест Radix-3 ===\n";
+        size_t n3 = 9;
+        std::vector<Complex>sig = { {1,0},{1,0},{1,0},{1,0},{1,0},{1,0},{1,0},{1,0},{1,0} };
+
+        auto res = FFT::fft_radix3_rec(sig, n3, false);
+        std::cout<<"Полученный спектр"<< std::endl;
+        for(size_t k = 0; k < n3; k++){
+            std::cout<< "X[" << k << "] = " << res[k] << "\n";
+
+        }
     }
 
     return 0;
