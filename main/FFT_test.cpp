@@ -11,28 +11,50 @@ typedef std::complex<double> Complex;
 
 class FFT{
 private:
-    // some simple ffts for mixed radix
-    void dft_radix2 (Complex result[], Complex input[]){
+    // some short ffts for mixed radix
+    std::vector<Complex> dft_radix2 (Complex input[]){
+
+        std::vector<Complex> result(2);
+        // butterfly-2
         result[0] = input[0] + input[1];
         result[1] = input[0] - input[1];
-        
+
+        return result;
     }
-    void dft_radix3 (Complex result[], Complex input[]){
+    std::vector<Complex> dft_radix3 (Complex input[]){
 
-
+        std::vector<Complex> result(3);
         double angle = -1*2*PI/3;
 
         // twiddels for radix3 but
         Complex w_3 = std::exp(Complex(0,angle));
         Complex w_3_2 = w_3*w_3;
 
+        //butterfly-3
         result[0] = input[0] + input[1] + input[2];
         result[1] = input[0] + w_3*input[1] + w_3_2*input[2];
         result[2] = input[0] + w_3_2*input[1] + w_3*input[2];
 
+        return result;
+    }
+    std::vector<Complex> dft_radix5(Complex input[]){
+        std::vector<Complex> result(5);
+        double angle  = -2*PI/5;
+        Complex w = std::exp(Complex(0, angle));
+        Complex w2 = w*w;
+        Complex w3 = w2*w;
+        Complex w4 = w2*w2;
+
+        result[0] = input[0] +  input[1] + input[2] + input[3] + input[4];
+        result[1] = input[0] +  w*input[1] + w2*input[2] + w3*input[3] + w4*input[4];
+        result[2] = input[0] + w2*input[1] + w4*input[2] + w*input[3] + w3*input[4];
+        result[3] = input[0] + w3*input[1] + w*input[2]  + w4*input[3] + w2*input[4];
+        result[4] = input[0] + w4*input[1] + w3*input[2] + w2*input[3] + w*input[4];
+
+
+        return result;
     }
 
-    void dft_radix5(Complex result[], Complex input[]){}
 public:
     static bool isValidLen(size_t n){
         if (n == 0){
@@ -158,7 +180,16 @@ public:
         return result;
     }
          
-    
+    static std::vector<Complex> mixed_radix(std::vector<Complex>& input, size_t n, bool inverse){
+        
+        /*size_t radix = factor;
+
+        std::vector<Complex> transformed;
+        if (radix == 2){
+            transformed = dft_radix2(block);
+        }
+        */
+    }
 };
 
 
