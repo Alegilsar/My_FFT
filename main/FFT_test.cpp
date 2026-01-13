@@ -379,6 +379,24 @@ int main()
         }
 
     }
+    /* // Choose it if you want how well mixed-radix works for length = 2^k
+    {
+        std::cout << "==== Test n-harmonics for radix-2 ===="<< std::endl;
+        size_t n2 = 8;
+        
+        std::vector<int> components = {3, 7};      
+        std::vector<Complex> sig = generate_multi_har_signal(components, n2);
+        FFT F2;
+        
+        std::vector<Complex> out_2 = F2.mixed_radix(sig, n2);
+
+        std::cout<<"Полученный спектр для radix-2"<< std::endl;
+        for(size_t k = 0; k < n2; k++){
+            std::cout<< "X[" << k << "] = " << out_2[k] << "\n";
+        }
+
+    }
+    */
 
     {
         std::cout << "==== Test n-harmonics for radix-3 ===="<< std::endl;
@@ -396,6 +414,24 @@ int main()
         }
 
     }
+    /* //I dont know, this part if you want check mixed-radix for length = 3^k
+    {
+        std::cout << "==== Test n-harmonics for radix-3 ===="<< std::endl;
+        size_t n3 = 9;
+        
+        std::vector<int> components = {3, 7};      
+        std::vector<Complex> sig = generate_multi_har_signal(components, n3);
+        FFT F3;
+        
+        std::vector<Complex> out = F3.mixed_radix(sig, n3);
+
+        std::cout<<"Полученный спектр для radix-3"<< std::endl;
+        for(size_t k = 0; k < n3; k++){
+            std::cout<< "X[" << k << "] = " << out[k] << "\n";
+        }
+
+    }
+    */
 
     {
         std::cout << "==== Test n-harmonics for radix-5 ===="<< std::endl;
@@ -438,6 +474,7 @@ int main()
         size_t n4 = 12;
         FFT mixed_test;
         std::vector<Complex> test = generate_complex_vector(n4) ;
+        // need copy because mixed radix is almost in-placed;
         std::vector<Complex> test_copy = test;
 
         
