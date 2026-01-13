@@ -12,12 +12,12 @@ typedef std::complex<double> Complex;
 class FFT{
 private:
 
-    std::vector<Complex> input;
     size_t n;
-    std::vector<std::vector<Complex>> twiddleTables;
+
+
     // some short ffts for mixed radix
     
-    static std::vector<Complex> dft_radix5(std::vector<Complex>& input){
+    std::vector<Complex> dft_radix5(std::vector<Complex>& input){
         std::vector<Complex> result(5);
         double angle  = -2*PI/5;
         Complex w = std::exp(Complex(0, angle));
@@ -35,7 +35,7 @@ private:
         return result;
     }
 
-    static std::vector<Complex> dft_radix2 (std::vector<Complex>& input){
+    std::vector<Complex> dft_radix2 (std::vector<Complex>& input){
 
         std::vector<Complex> result(2);
         // butterfly-2
@@ -45,10 +45,10 @@ private:
         return result;
     }
     
-    static std::vector<Complex> dft_radix3 (std::vector<Complex>& input){
+    std::vector<Complex> dft_radix3 (std::vector<Complex>& input){
 
         std::vector<Complex> result(3);
-        double angle = -1*2*PI/3;
+        double angle = -2*PI/3;
 
         // twiddels for radix3 but
         Complex w_3 = std::exp(Complex(0,angle));
@@ -61,7 +61,9 @@ private:
 
         return result;
     }
-    static bool isValidLen(size_t n){
+    
+    // check the length
+    bool isValidLen(size_t n){
         if (n == 0){
             return false;
         }
@@ -72,24 +74,7 @@ private:
         return n == 1;
     } 
     
-    static void BitRev(std::vector<Complex>& data, size_t n){
-        for (size_t i = 1, j = 0; i < n; ++i) {
-        
-        size_t bit = n >> 1;
-        
-        while (j & bit) {
-            j ^= bit;     
-            bit >>= 1;    
-        }
-        j ^= bit;  
-        
-        if (i < j) {
-            std::swap(data[i], data[j]);
-        }
-    }  
-    }
-
-    static std::vector<size_t> GetFactor(size_t n){
+    std::vector<size_t> GetFactor(size_t n){
         // for mixed radix need multidim. Size of each dim will get for each radixs
         std::vector<size_t> primes = {2, 3, 5};
         std::vector<size_t> factors;
@@ -105,16 +90,13 @@ private:
 
     } 
     
-    
-    
-public:
-    
-    static void digit_Rev(std::vector<Complex>& input, size_t n, std::vector<size_t> factor ){
+    //Peermutation of vector components
+    void digit_revers(std::vector<Complex>& input, size_t n, std::vector<size_t> factor ){
         std::vector<Complex> output(n);
         for (size_t i = 0; i < n ; ++i){
             size_t rev = 0;
             size_t temp = i;
-            for(int f = 0; f < factor.size() ; ++f){
+            for(int f = factor.size() - 1 ; f >= 0 ; --f){
                 size_t radix = factor[f];
                 rev = radix*rev + (temp%radix);
                 temp/=radix;
@@ -125,8 +107,26 @@ public:
         input = std::move(output);
         
     }
-    static std::vector<Complex> fft_radix2_inplace(std::vector<Complex>& input, size_t n){
-        // it was inplaced but for comfort use out of place
+ 
+    void BitRev(std::vector<Complex>& data, size_t n){
+        for (size_t i = 1, j = 0; i < n; ++i) {
+        
+        size_t bit = n >> 1;
+        
+        while (j & bit) {
+            j ^= bit;     
+            bit >>= 1;    
+        }
+        j ^= bit;  
+        
+        if (i < j) {
+            std::swap(data[i], data[j]);
+        }
+    }  
+    }
+public:
+    
+    std::vector<Complex> fft_radix2(std::vector<Complex>& input, size_t n){
         std::vector<Complex> res = input;
     
         // optimization with pre-calc of twiddle
@@ -147,7 +147,6 @@ public:
                     size_t idx = j*step;
                     Complex u = res[i+j];
                     Complex v = twiddle[idx]*res[i+j + len/2];
-                    std::cout << twiddle[idx] << std::endl;
                     res[i+j] = u + v;
                     res[i+j+len/2] = u - v;
                 }
@@ -155,7 +154,7 @@ public:
         return res;
 
     }
-    static std::vector<Complex> fft_radix3_rec(std::vector<Complex>& input, size_t n){
+    std::vector<Complex> fft_radix3_rec(std::vector<Complex>& input, size_t n){
         if (n==1) return input;
 
         // this part will be out off part because I want
@@ -193,13 +192,10 @@ public:
         return result;
     }
  
-    static void process_stage(std::vector<Complex>& data, size_t stage, size_t stage_size, std::vector<size_t> factors, size_t N, std::vector<std::vector<Complex>>& twiddleTables){
+ 
+    void process_stage(std::vector<Complex>& data, size_t stage, size_t stage_size, std::vector<size_t> factors, size_t N){
         size_t radix = factors[stage];
         size_t groups = N / (radix * stage_size);
-        std::cout<< " =======Cтадияы == " << stage << std::endl;
-        const auto& twiddles = twiddleTables[stage];
-        size_t twiddleIdx = 0;
-        
     
         std::vector<Complex> block(radix);
         
@@ -207,23 +203,16 @@ public:
             for (size_t offset = 0; offset < stage_size; ++offset) {
 
 
-                // 1. Собираем блок из данных
-
+                // Сonstruct block + apply twiddles 
                 size_t baseIdx = group * radix * stage_size + offset;
                 for (size_t r = 0; r < radix; ++r) {
                     size_t idx = baseIdx + r * stage_size;
-                    block[r] = data[idx];
-                }
-                for (size_t r = 0; r < radix; ++r) {
-                    size_t k = offset;
+                    double angle = -2.0 * PI * r * offset *groups /(N);
 
-                    double angle = -2.0 * PI * r * k *groups /(N);
-                    std::cout <<"Индекс"<< std::endl;
-                    std::cout << r*k % N << std::endl;
-                    std::cout << std::exp(Complex(0, angle)) << std::endl;
-                    block[r] *= std::exp(Complex(0, angle));
+                    block[r] = data[idx]*std::exp(Complex(0, angle));
                 }
-                std::vector<Complex> dftResult;
+                //Calculate butterfly of block 
+                std::vector<Complex> dftResult(radix);
                 switch (radix) {
                     case 2:
                         dftResult = dft_radix2(block);
@@ -234,14 +223,10 @@ public:
                     case 5:
                         dftResult = dft_radix5(block);
                         break;
-                    default:
-                        throw std::runtime_error("Unsupported radix");
+
                 }
-                
-                // 3. Применяем twiddle factors (кроме первого элемента)
-               
-                
-                // 4. Записываем результат обратно
+            
+                // rewrite input with dft_result
                 for (size_t r = 0; r < radix; ++r) {
                     size_t idx = baseIdx + r * stage_size;
                     data[idx] = dftResult[r];
@@ -251,195 +236,28 @@ public:
 
     }
 
-    static std::vector<Complex> mixed_radix (std::vector<Complex>& input , size_t n ){
+    std::vector<Complex> mixed_radix (std::vector<Complex>& input , size_t n ){
+     
         auto factors = GetFactor(n);
-        std::vector<std::vector<Complex>> twiddleTables;
-        twiddleTables.clear();
-        size_t stageSize = 1;
-        
-        for (size_t stage = 0; stage < factors.size(); ++stage) {
-            
-            size_t radix = factors[stage];
-            size_t groups = n / (radix * stageSize);
-            std::vector<Complex> stageTwiddles;
-            
-            if (stage  == 0){
-                for (size_t group = 0; group < groups; ++group)
-                 stageTwiddles.push_back(std::exp(Complex(0, 0)));
-            }
-            else{
-            // Для каждого элемента внутри блока (кроме первого)
-            for (size_t group = 0; group < groups; ++group) {
-                for (size_t k = 0; k < stageSize; ++k) {
-                    double baseAngle = -2.0 * PI * (k )/ (radix*stageSize);
-                    
-                    for (size_t r = 1; r < radix; ++r) {
-                        double angle = baseAngle * r;
-                        stageTwiddles.push_back(std::exp(Complex(0, angle)));
-                    }
-                }
-            }
-            }
-            
-            twiddleTables.push_back(stageTwiddles);
-            stageSize *= radix;
-        }
-        
-        digit_Rev(input, n, {5,2});
+
+        digit_revers (input, n, factors);
         size_t stage_size = 1;
         for (size_t stage = 0; stage < factors.size(); ++stage){
-            process_stage(input , stage, stage_size, factors, n, twiddleTables);
+            process_stage(input , stage, stage_size, factors, n);
             stage_size *= factors[stage];
 
         }
         return input;
     }
 
-    /*static void precomputeTwiddles() {
-        twiddleTables.clear();
-        size_t stageSize = 1;
-        
-        for (size_t radix : factors) {
-            size_t groups = N / (radix * stageSize);
-            std::vector<Complex> stageTwiddles;
-            
-            // Twiddle factors для этого этапа
-            // Для каждого элемента внутри блока (кроме первого)
-            for (size_t group = 0; group < groups; ++group) {
-                for (size_t k = 0; k < stageSize; ++k) {
-                    double baseAngle = -2.0 * PI * (group * stageSize + k) / N;
-                    
-                    for (size_t r = 1; r < radix; ++r) {
-                        double angle = baseAngle * r;
-                        stageTwiddles.push_back(std::exp(Complex(0, angle)));
-                    }
-                }
-            }
-            
-            twiddleTables.push_back(stageTwiddles);
-            stageSize *= radix;
-        }
-    }*/
-    /*   static std::vector<Complex> mixed_radix(std::vector<Complex>& input, size_t n){
-        // will be out of place, because problem with order 
-        auto factors = GetFactor(n);
-
-        std::vector<Complex> result  = input;
-        digit_Rev(result, n, factors);
-
-        
-        for (size_t stage = 0 ; stage < factors.size(); ++stage){
-            size_t radix = factors[stage];
-            size_t rem = current -> size()/ radix;
-
-            for (size_t i = 0; i < rem ; ++i){
-                std::vector<Complex> block(radix);
-                for (size_t r = 0 ; r < radix; ++r ){
-                    double angle = -2*PI*i*r/n;
-                    Complex twiddle = std::exp(Complex(0, angle));
-
-                    block[r] = (*current)[i + r*rem]*twiddle; 
-                }
-
-                std::vector<Complex> transform(radix);
-                if (radix == 2){
-                    transform = dft_radix2(block);
-                }
-                else if(radix == 3){
-                    transform = dft_radix3(block);   
-                }
-                else if(radix == 5){
-                    transform = dft_radix5(block);
-                }
-                // count twiddles between stages
-                for(size_t k = 0; k < radix; ++k){
-                    
-                    size_t ind = i*radix + k;
-                    (*next)[ind] = transform[k];    
-                }
-
-                
-
-            }
-
-            std::swap(current, next);
-            
-        }
-        std::vector<Complex> result = *current;
-
-        //digit_Rev(result, n, factors);
-        return result;
-    }*/
-    
-    static void Stockham_stage (std::vector<Complex>& input, std::vector<Complex>& output, size_t N, size_t radix, size_t stage_size){
-
-        size_t groups = N/(radix*stage_size);
-
-        for (size_t group = 0; group < groups; ++group) {
-            for (size_t offset = 0; offset < stage_size; ++offset) {
-                std::vector<Complex> temp(radix);
-
-                for (size_t r = 0; r < radix; ++r) {
-                    size_t idx = group*radix*stage_size + r * stage_size + offset;
-                    size_t g_k = group*stage_size+ offset;
-                    double angle = -2.0*PI*r*offset*groups/(N);
-                    temp[r] = input[idx]*std::exp(Complex(0, angle));
-                }
-                
-                std::vector<Complex> dftResult;
-                switch (radix) {
-                    case 2: dftResult = dft_radix2(temp); break;
-                    case 3: dftResult = dft_radix3(temp); break;
-                    case 5: dftResult = dft_radix5(temp); break;
-                    default:
-                        throw std::runtime_error("Unsupported radix");
-                }
-                
-                // twiddle + place
-                for (size_t r = 0; r < radix; ++r){
-                    size_t out_ind = group*radix*stage_size + offset*radix + r;
-                    
-                    output[out_ind] = dftResult[r];
-                }
-               
-            }
-        }
-
-    }
-    static std::vector<Complex> stockham_mixed_radix_fft(const std::vector<Complex>& input) {
-        
-        size_t N = input.size();
-        std::vector<size_t>factors = {2,2,2};
-
-        std::vector<Complex> buf1 = input;
-        std::vector<Complex> buf2(N);
-
-        size_t stageSize = 1;
-        bool bufer_switch = true;
-
-        for (size_t stage = 0; stage < factors.size(); ++stage) {
-            size_t radix = factors[stage];
-
-            if (bufer_switch)
-                Stockham_stage(buf1, buf2, N, radix, stageSize);
-            else
-                Stockham_stage(buf2, buf1, N, radix, stageSize);
-
-            stageSize *= radix;
-            bufer_switch = !bufer_switch;
-        }
-
-        return bufer_switch ? buf1 : buf2;
-    }
-
-    static std::vector<Complex> fft(  std::vector<Complex>& input , size_t n){
+    std::vector<Complex> fft(  std::vector<Complex>& input , size_t n){
         size_t temp = n;
         std::vector<Complex> out;
         while (temp%2 == 0){
             temp/=2;
         }
         if (temp == 1){
-            out = fft_radix2_inplace(input, n);
+            out = fft_radix2(input, n);
             return out ;
         }
         else{temp = n;}
@@ -451,11 +269,11 @@ public:
             out = fft_radix3_rec(input, n);
             return out;
         }else{
-            //out = mixed_radix(input,n);
+            out = mixed_radix(input,n);
             return out;
         }
     }
-    static std::vector<Complex> transform (std::vector<Complex>& input, size_t n, bool inverse ){
+    std::vector<Complex> transform (std::vector<Complex>& input, size_t n, bool inverse ){
 
         bool legal =  isValidLen(n);
         if (legal){
@@ -485,89 +303,75 @@ public:
         }
     }
     
-    static std::vector<Complex> generate_complex_vector(
-        size_t n, 
-        double real_min = -100.0, 
-        double real_max = 100.0,
-        double imag_min = -100.0, 
-        double imag_max = 100.0) {
-        
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_real_distribution<> real_dist(real_min, real_max);
-        std::uniform_real_distribution<> imag_dist(imag_min, imag_max);
-        
-        std::vector<Complex> result(n);
+    
+};
 
-        
-        for (size_t i = 0; i < n; ++i) {
-            result[i] = (real_dist(gen), imag_dist(gen));
-        }
-        
-        return result;
+std::vector<Complex> generate_complex_vector(
+    size_t len, 
+    double real_min = -100.0, 
+    double real_max = 100.0,
+    double imag_min = -100.0, 
+    double imag_max = 100.0) {
+    
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> real_dist(real_min, real_max);
+    std::uniform_real_distribution<> imag_dist(imag_min, imag_max);
+    
+    std::vector<Complex> result(len);
 
     
-    } 
-    static void get_error(std::vector<Complex>& input , std::vector<Complex>& out ){
+    for (size_t i = 0; i < len; ++i) {
+        result[i] = {real_dist(gen), imag_dist(gen)};
+    }
+    
+    return result;
+
+
+} 
+void get_error(std::vector<Complex>& input , std::vector<Complex>& out ){
         size_t N = input.size();
         Complex error;
         for (size_t k = 0; k < N; ++k){
             error  = input[k] - out[k];
             std::cout <<"Error in "<< k << " symb "<< error << std::endl;
         }
-    }
-};
-
-void fft_stage_order(std::vector<Complex>& input , std::vector<size_t> factor, size_t N ){
-    
-
 }
 
+std::vector<Complex> generate_multi_har_signal(std::vector<int>& harmonics, size_t length)
+{
+    
+    std::cout<< "Используемые гармоники :\n";
+    for (size_t i = 0 ; i < harmonics.size() ; ++i){
+         std::cout<< harmonics[i]<< "\n" ;
+    }
+  
+    // generate multi-harmonic signal 
+    std::vector<Complex> signal(length);
+    for(size_t k = 0 ; k < length ; ++k){
+        for(size_t i = 0 ; i < harmonics.size(); ++i){
+            int har = harmonics[i];
+            double angle = 2*PI*har*k/length;
+            signal[k] += std::exp(Complex(0,angle));
+        }        
+    }
+
+    return signal;
+}  
 
 int main()
 {
     
-    /*{
-        std::vector<size_t> factors = {2,2,3};
-        std::vector<Complex> sig = { {0,0}, {1,0} , {2,0} , {3,0} , {4,0} , {5,0}, {6, 0}, {7,0}, {8,0}, {9,0},{10,0}, {11,0}};
-        FFT::digit_Rev(sig, 12, factors);
-        size_t N = sig.size();
-        std::vector<Complex> copy = sig;
-        size_t stage_size = 1;
-        for (auto f : factors){
-            size_t radix = f;
-            size_t groups = N / (radix*stage_size);
-            for (size_t group = 0; group < groups ; ++group ){
-                for (size_t offset = 0; offset < stage_size ; ++offset  ){
-                        size_t base_ind = group * radix * stage_size + offset;
-                        std::vector<Complex> block(radix);
-                        for (size_t r = 0; r < radix ; ++r){
-                            size_t idx = base_ind + r * stage_size;
-                            block[r] = sig[idx];
-                        }  
-
-                        for (size_t r = 0; r < radix; ++r) {
-                            size_t idx = base_ind*stage_size + r;
-                            copy[idx] = block[r];
-                        }
-                }
-            }
-
-            stage_size *= radix;
-
-        }
-
-    }*/
 
     {
-        std::cout << "Comparison of two methods radix_2 and mixed-radix for len = 2^k"<< std::endl;
+        std::cout << "==== Test n-harmonics for radix-2 ===="<< std::endl;
         size_t n2 = 8;
-        std::vector<Complex> sig(n2);
-        for (size_t k = 0; k < n2; ++k){
-            sig[k] = std::exp(Complex(0, 2*PI*3*k/n2)) + std::exp(Complex(0, 2*PI*6*k/n2));
-        }       
         
-        std::vector<Complex> out_2 = FFT::fft_radix2_inplace(sig, n2);
+        std::vector<int> components = {3, 7};      
+        std::vector<Complex> sig = generate_multi_har_signal(components, n2);
+        FFT F2;
+        
+        std::vector<Complex> out_2 = F2.fft_radix2(sig, n2);
 
         std::cout<<"Полученный спектр для radix-2"<< std::endl;
         for(size_t k = 0; k < n2; k++){
@@ -575,60 +379,75 @@ int main()
         }
 
     }
-    
 
-
- {
-        
-        std::cout << "=== Тест Radix-3 ===\n";
-        size_t n_mixed = 10;
-        std::vector<Complex> test(n_mixed);
-        for (size_t k = 0; k < n_mixed; ++k){
-           test[k] =  std::exp(Complex(0, 2*PI*3*k/n_mixed));
-        }
-        /*test[0] =Complex(1.0,0.0); 
-        for (size_t k = 1; k < n_mixed; ++k){
-
-            test[k] = Complex(0,0);
-        }   */     
-        
-        std::vector<Complex> out = FFT::mixed_radix(test, n_mixed);
-        std::cout<<"Полученный спектр"<< std::endl;
-        for(size_t k = 0; k < n_mixed; k++){
-            std::cout<< "X[" << k << "] = " << out[k] << "\n";
-        }
-    }
- /*
     {
-        // mixed version don't work correctly( problems with dig_rev and twiddels between stages), I'm sorry
-         std::cout << "=== Тест Radix-Mixed ===\n";
-        size_t n_mixed = 12;
-        std::vector<Complex> test(n_mixed);
-        for (size_t k = 0; k < n_mixed; ++k){
-            test[k] = {1,0};
-        }        
+        std::cout << "==== Test n-harmonics for radix-3 ===="<< std::endl;
+        size_t n3 = 9;
         
-        std::vector<Complex> out = FFT::mixed_radix(test, n_mixed);
-        std::cout<<"Полученный спектр"<< std::endl;
+        std::vector<int> components = {3, 7};      
+        std::vector<Complex> sig = generate_multi_har_signal(components, n3);
+        FFT F3;
+        
+        std::vector<Complex> out = F3.fft_radix3_rec(sig, n3);
+
+        std::cout<<"Полученный спектр для radix-3"<< std::endl;
+        for(size_t k = 0; k < n3; k++){
+            std::cout<< "X[" << k << "] = " << out[k] << "\n";
+        }
+
+    }
+
+    {
+        std::cout << "==== Test n-harmonics for radix-5 ===="<< std::endl;
+        size_t n5 = 25;
+        
+        std::vector<int> components = {3, 7};      
+        std::vector<Complex> sig = generate_multi_har_signal(components, n5);
+        FFT F5;
+        
+        std::vector<Complex> out = F5.mixed_radix(sig, n5);
+
+        std::cout<<"Полученный спектр для radix-5"<< std::endl;
+        for(size_t k = 0; k < n5; k++){
+            std::cout<< "X[" << k << "] = " << out[k] << "\n";
+        }
+
+    }
+
+    {
+        
+       std::cout << "==== Test n-harmonics for mixed - radix ===="<< std::endl;
+        size_t n_mixed = 24;
+        
+        std::vector<int> components = {3, 7};      
+        std::vector<Complex> sig = generate_multi_har_signal(components, n_mixed);
+        FFT F3;
+        
+        std::vector<Complex> out = F3.mixed_radix(sig, n_mixed);
+
+        std::cout<<"Полученный спектр для mixed radix"<< std::endl;
         for(size_t k = 0; k < n_mixed; k++){
             std::cout<< "X[" << k << "] = " << out[k] << "\n";
         }
-    }   
+
+    }
+
 
     {
         std::cout<< "======== complited  func check ========" << "\n";
         size_t n4 = 12;
-        std::vector<Complex> test = FFT::generate_complex_vector(n4) ;
+        FFT mixed_test;
+        std::vector<Complex> test = generate_complex_vector(n4) ;
+        std::vector<Complex> test_copy = test;
 
         
-        std::vector<Complex> out;
-        out = FFT::transform(test, n4, false);
+        std::vector<Complex> spectrum =  mixed_test.transform(test_copy, n4, false);
+        std::vector<Complex> time_output =  mixed_test.transform(spectrum, n4, true);
 
-        std::vector<Complex> rev = FFT::transform(out, n4, true);
 
-        FFT::get_error(test, rev);
+        get_error(test, time_output );
 
-    }*/
+    }
     return 0;
 
 
